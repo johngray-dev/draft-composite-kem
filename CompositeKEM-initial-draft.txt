@@ -1,0 +1,358 @@
+LAMPS                                                            J. Gray
+Internet-Draft                                              M. Ounsworth
+                                                                 Entrust
+Intended status: Standards Track                                
+Expires: September 18, 2022                                                             
+                                                          March 18, 2022
+
+
+       Composite KEM For Use In Internet PKI
+                 
+
+Abstract
+
+   With the widespread adoption of post-quantum cryptography will come
+   the need for an entity to possess multiple public keys on different
+   cryptographic algorithms.  Since the trustworthiness of individual
+   post-quantum algorithms is at question, a multi-key cryptographic
+   operation will need to be performed in such a way that breaking it
+   requires breaking each of the component algorithms individually.
+   This requires defining new procedures for key encapsulation.
+
+   This document defines a Composite key encapsulation mechanism (KEM)
+   procedure, for use with Composite keys which consist of combinations 
+   of Encryption or KEM algorithms for each composite component  
+   algorithm.  
+
+   This document is intended to be coupled with the composite keys
+   structure define in RFC <document reference>.
+
+Status of This Memo
+
+   This Internet-Draft is submitted in full conformance with the
+   provisions of BCP 78 and BCP 79.
+
+   Internet-Drafts are working documents of the Internet Engineering
+   Task Force (IETF).  Note that other groups may also distribute
+   working documents as Internet-Drafts.  The list of current Internet-
+   Drafts is at https://datatracker.ietf.org/drafts/current/.
+
+   Internet-Drafts are draft documents valid for a maximum of six months
+   and may be updated, replaced, or obsoleted by other documents at any
+   time.  It is inappropriate to use Internet-Drafts as reference
+   material or to cite them other than as "work in progress."
+
+   This Internet-Draft will expire on September 18, 2022.
+
+Copyright Notice
+
+   Copyright (c) 2022 IETF Trust and the persons identified as the
+   document authors.  All rights reserved.
+
+   This document is subject to BCP 78 and the IETF Trust's Legal
+   Provisions Relating to IETF Documents
+   (https://trustee.ietf.org/license-info) in effect on the date of
+   publication of this document.  Please review these documents
+   carefully, as they describe your rights and restrictions with respect
+   to this document.  Code Components extracted from this document must
+   include Simplified BSD License text as described in Section 4.e of
+   the Trust Legal Provisions and are provided without warranty as
+   described in the Simplified BSD License.
+
+Table of Contents
+
+   1.  Introduction  . . . . . . . . . . . . . . . . . . . . . . . .   3
+     1.1.  Terminology . . . . . . . . . . . . . . . . . . . . . . .   4
+   2.  Composite Key Encapsulation . . . . . . . . . . . . . . . . .   5
+   3.  Composite Key Decapsulation . . . . . . . . . . . . . . . . .   5
+   3.2.  Composite KEM Ciphertext encoding
+   4.  IANA Considerations . . . . . . . . . . . . . . . . . . . . .  12
+   5.  Security Considerations . . . . . . . . . . . . . . . . . . .  12
+   6.  Appendices  . . . . . . . . . . . . . . . . . . . . . . . . .  14
+   7.  Contributors and Acknowledgements . . . . . . . . . . . . . .  20
+     7.1.  Making contributions  . . . . . . . . . . . . . . . . . .  21
+   8.  References  . . . . . . . . . . . . . . . . . . . . . . . . .  21
+     8.1.  Normative References  . . . . . . . . . . . . . . . . . .  21
+     8.2.  Informative References  . . . . . . . . . . . . . . . . .  22
+   Authors' Addresses  . . . . . . . . . . . . . . . . . . . . . . .  23
+
+1.  Introduction
+
+   During the transition to post-quantum cryptography, there will be
+   uncertainty as to the strength of cryptographic algorithms; we will
+   no longer fully trust traditional cryptography such as RSA, Diffie-
+   Hellman, DSA and their elliptic curve variants, but we will also not
+   fully trust their post-quantum replacements until they have had
+   sufficient scrutiny.  Unlike previous cryptographic algorithm
+   migrations, the choice of when to migrate and which algorithms to
+   migrate to, is not so clear.  Even after the migration period, it may
+   be advantageous for an entity's cryptographic identity to be composed
+   of multiple public-key algorithms.
+
+   With the deployment of composite public keys, a way to combine
+   composite encryption into a key encapsulation mechanism is required.
+
+   This document is intended for general applicability anywhere that
+   keys are used within PKIX or CMS structures.
+
+
+1.1.  Terminology
+
+   The key words "MUST", "MUST NOT", "REQUIRED", "SHALL", "SHALL NOT",
+   "SHOULD", "SHOULD NOT", "RECOMMENDED", "NOT RECOMMENDED", "MAY", and
+   "OPTIONAL" in this document are to be interpreted as described in BCP
+   14 [RFC2119] [RFC8174] when, and only when, they appear in all
+   capitals, as shown here.
+
+   The following terms are used in this document:
+
+   ALGORITHM: An information object class for identifying the type of
+   cryptographic key being encapsulated.
+
+   BER: Basic Encoding Rules (BER) as defined in [X.690].
+
+   COMBINER MODE: A combiner mode specifies how keys are to be combined
+   together into a single cryptographic operation.  Examples include
+   AND, OR, K-of-N.  Specifications of composite signature or encryption
+   proceedures will need to specify the behaviour under each mode.
+
+   COMPONENT ALGORITHM: A single basic algorithm which is contained
+   within a composite algorithm.
+
+   COMPOSITE ALGORITHM: An algorithm which is a sequence of two or more
+   component algorithms.
+
+   DER: Distinguished Encoding Rules as defined in [X.690].
+
+   PUBLIC / PRIVATE KEY: The public and private portion of an asymmetric
+   cryptographic key, making no assumptions about which algorithm.
+
+   SHARED SECRET - A unique bitstring that is computed from the combination 
+   of public and private key data that is known only by the parties that are
+   in communication
+
+
+2.  Composite Key Encapsulation
+
+    Composite key encapsulations takes a CompositePublicKey as its input.  The
+    CompositePublicKey MUST contain composite keys (Pi .. Pn) which represent 
+    an algorithm which is a KEM (Key Encapsulation Method), or an algorithm that 
+    contains encryption or decryption primitive.  For example (RSA).   
+
+    This operation outputs a shared-secret and cipher text.   If the 
+    CompositePublicKey is using an algorithm mode which does not require all keys 
+    to be used (for example id-composite-or or id-composite-k-of-n), and the
+    specific component algorithm is not required by the underlying application
+    usage, then the ciphertext and shared secret for that component is empty.  
+
+    Input:  CompositePublicKey (PK1, PK2 .. PKn)
+
+    Output:  SS, CT
+
+    1.  for i := 1 to n
+        a. if PKi is to be skipped
+            CTi := emptyOctetString
+            SSi := emptyOctetString
+            continue to next i
+
+        b. if Pki is of type KEM:
+             SSi,CTi := encaps(PKi)
+  
+          Else:
+            SSi := random_bits(SIZE)
+            CTi := encrypt(SSi, PKi)   
+
+     2.   SS = SSi ||  SSn
+          CT = CT1, CT2, .., CTn
+
+
+
+3.  Composite Key Decapsulation
+
+    Composite key decapsulations takes a CompositePrivateKey as its input and the
+    sequence of Cipher texts (ct1 .. ctn) computed by the composite key 
+    encapsulation method.  The CompositePrivateKey MUST contain composite keys 
+    (Pi .. Pn) which represent an algorithm which is a KEM (Key Encapsulation Method),
+    or an algorithm that contains encryption or decryption primitive.  These keys 
+    MUST consist of the same component keys in the same order as the Composite Key 
+    Encapsulation process that generated them.  
+
+    This operation outputs a shared-secret.   If the CompositePrivateKey is using an
+    algorithm mode which does not require all keys to be used the specific component 
+    algorithm is not required by the underlying application usage, then the ciphertext
+    and shared secret for that component is empty.  
+
+
+    Input:   CompositePrivateKey = SK1, SK2 .. SKn
+             CT = CT1, CT2, .., CTn
+
+    Output:  SS
+
+    1.    for i := 1 to n
+          if Ski is not required and cti = emptyOctetString         
+             SSi := emptyOctetString         
+          Else, if SKi is of type KEM:
+             SSi := decaps(Cti, SKi)
+          Else:
+             SSi := decrypt(Cti, SKi)
+
+    2. Output SS = SSi ||  SSn
+
+
+3.1  Composite KEM CipherText Encoding
+
+    For ease of use when encoding and decoding, the following encoding is 
+    suggested for the CipherText.   
+
+    CompositeKemCT :: SEQUENCE SIZE (2..MAX) of OctetString
+
+    This will allow implementations a simple and uniform way to distribute
+    the set of Cipher texts required for the decapsulation process.  
+    It is not mandatory as an implementation could choose to store the
+    set of Cipher texts produced in a different format, so long as they
+    are available at time of decapsulation.
+
+
+4.  IANA Considerations
+
+   The ASN.1 module OID is TBD.  
+
+
+5.  Security Considerations
+
+5.1.  Reuse of keys in a Composite public key
+
+   <TBD>
+
+
+
+6.  Appendices
+
+<TBD>
+
+
+
+7.  Contributors and Acknowledgements
+
+   This document incorporates contributions and comments from a large
+   group of experts.  The Editors would especially like to acknowledge
+   the expertise and tireless dedication of the following people, who
+   attended many long meetings and generated millions of bytes of
+   electronic mail and VOIP traffic over the past year in pursuit of
+   this document:
+
+   Serge Mister (Entrust)
+
+   We are grateful to all, including any contributors who may have been
+   inadvertently omitted from this list.
+
+   This document borrows text from similar documents, including those
+   referenced below.  Thanks go to the authors of those documents.
+   "Copying always makes things easier and less error prone" -
+   [RFC8411].
+
+7.1.  Making contributions
+
+   Additional contributions to this draft are weclome.  Please see the
+   working copy of this draft at, as well as open issues at:
+
+   https://github.com/EntrustCorporation/draft-ounsworth-pq-composite-
+   keys
+
+8.  References
+
+8.1.  Normative References
+
+   [RFC1421]  Linn, J., "Privacy Enhancement for Internet Electronic
+              Mail: Part I: Message Encryption and Authentication
+              Procedures", RFC 1421, DOI 10.17487/RFC1421, February
+              1993, <https://www.rfc-editor.org/info/rfc1421>.
+
+   [RFC2119]  Bradner, S., "Key words for use in RFCs to Indicate
+              Requirement Levels", BCP 14, RFC 2119,
+              DOI 10.17487/RFC2119, March 1997,
+              <https://www.rfc-editor.org/info/rfc2119>.
+
+   [RFC2986]  Nystrom, M. and B. Kaliski, "PKCS #10: Certification
+              Request Syntax Specification Version 1.7", RFC 2986,
+              DOI 10.17487/RFC2986, November 2000,
+              <https://www.rfc-editor.org/info/rfc2986>.
+
+   [RFC4210]  Adams, C., Farrell, S., Kause, T., and T. Mononen,
+              "Internet X.509 Public Key Infrastructure Certificate
+              Management Protocol (CMP)", RFC 4210,
+              DOI 10.17487/RFC4210, September 2005,
+              <https://www.rfc-editor.org/info/rfc4210>.
+
+
+   [RFC5280]  Cooper, D., Santesson, S., Farrell, S., Boeyen, S.,
+              Housley, R., and W. Polk, "Internet X.509 Public Key
+              Infrastructure Certificate and Certificate Revocation List
+              (CRL) Profile", RFC 5280, DOI 10.17487/RFC5280, May 2008,
+              <https://www.rfc-editor.org/info/rfc5280>.
+
+   [RFC5652]  Housley, R., "Cryptographic Message Syntax (CMS)", STD 70,
+              RFC 5652, DOI 10.17487/RFC5652, September 2009,
+              <https://www.rfc-editor.org/info/rfc5652>.
+
+   [RFC5914]  Housley, R., Ashmore, S., and C. Wallace, "Trust Anchor
+              Format", RFC 5914, DOI 10.17487/RFC5914, June 2010,
+              <https://www.rfc-editor.org/info/rfc5914>.
+
+   [RFC5958]  Turner, S., "Asymmetric Key Packages", RFC 5958,
+              DOI 10.17487/RFC5958, August 2010,
+              <https://www.rfc-editor.org/info/rfc5958>.
+
+   [RFC7468]  Josefsson, S. and S. Leonard, "Textual Encodings of PKIX,
+              PKCS, and CMS Structures", RFC 7468, DOI 10.17487/RFC7468,
+              April 2015, <https://www.rfc-editor.org/info/rfc7468>.
+
+   [RFC8174]  Leiba, B., "Ambiguity of Uppercase vs Lowercase in RFC
+              2119 Key Words", BCP 14, RFC 8174, DOI 10.17487/RFC8174,
+              May 2017, <https://www.rfc-editor.org/info/rfc8174>.
+
+   [RFC8411]  Schaad, J. and R. Andrews, "IANA Registration for the
+              Cryptographic Algorithm Object Identifier Range",
+              RFC 8411, DOI 10.17487/RFC8411, August 2018,
+              <https://www.rfc-editor.org/info/rfc8411>.
+
+   [X.690]    ITU-T, "Information technology - ASN.1 encoding Rules:
+              Specification of Basic Encoding Rules (BER), Canonical
+              Encoding Rules (CER) and Distinguished Encoding Rules
+              (DER)", ISO/IEC 8825-1:2015, November 2015.
+
+8.2.  Informative References
+
+   [Bindel2017]
+              Bindel, N., Herath, U., McKague, M., and D. Stebila,
+              "Transitioning to a quantum-resistant public key
+              infrastructure", 2017, <https://link.springer.com/
+              chapter/10.1007/978-3-319-59879-6_22>.
+
+   [I-D.ounsworth-pq-composite-sigs]
+              Ounsworth, M. and M. Pala, "Composite Signatures For Use
+              In Internet PKI", draft-ounsworth-pq-composite-sigs-05
+              (work in progress), July 2021.
+
+
+
+Authors' Addresses
+
+   John Gray
+   Entrust Limited
+   2500 Solandt Road -- Suite 100
+   Ottawa, Ontario K2K 3G5
+   Canada
+
+   Email:  john.gray@entrust.com
+
+   Mike Ounsworth
+   Entrust Limited
+   2500 Solandt Road -- Suite 100
+   Ottawa, Ontario  K2K 3G5
+   Canada
+
+   Email: mike.ounsworth@entrust.com
+
+
+
